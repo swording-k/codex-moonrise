@@ -16,7 +16,8 @@ jobs:
       - name: Verify signature and architecture
         run: |
           codesign --verify --deep --strict "Codex Moonrise.app"
-          xcrun lipo "Codex Moonrise.app/Contents/MacOS/Moonrise" -verify_arch arm64 x86_64
+          archs="$(xcrun lipo -archs "Codex Moonrise.app/Contents/MacOS/Moonrise")"
+          [[ " $archs " == *" arm64 "* && " $archs " == *" x86_64 "* ]]
       - name: Package
         run: ditto -c -k --sequesterRsrc --keepParent "Codex Moonrise.app" Codex-Moonrise-macOS-universal.zip
       - uses: actions/upload-artifact@v4
