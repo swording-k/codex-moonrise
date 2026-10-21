@@ -4,7 +4,7 @@
 
 星际穿梭 → 粒子标志重组 → 字标显现 → 立体工作台 → 代码流与悬浮面板 → CRT 收束 → 真实 Codex。
 
-[下载 macOS 版本](https://github.com/swording-k/codex-moonrise/releases/latest) · [在线体验](https://swording-k.github.io/codex-moonrise/) · [English](#english) · [MIT License](LICENSE)
+[下载 macOS 版本](https://github.com/swording-k/codex-moonrise/releases/latest) · [在线体验](https://swording-k.github.io/codex-moonrise/) · [重启快捷指令配置](Shortcuts/README.md) · [English](#english) · [MIT License](LICENSE)
 
 ![代码流与悬浮工作台](docs/workspace.jpg)
 
@@ -27,6 +27,22 @@
 不会改写官方应用、替换签名、注入代码，也不会修改你的 Dock 或聊天记录。
 
 > 下载包使用本地 ad-hoc 签名，尚未做 Apple Developer ID 签名与公证；其他 Mac 首次打开时可能被 Gatekeeper 拦截。也提供完整源码，可自行构建。
+
+## 想像视频里一样：点击一个图标，重启并播放动画
+
+可用 macOS 自带的「快捷指令」把原来的启动入口接到 Moonrise：
+
+```text
+退出真正的 Codex / ChatGPT → 等待 3 秒 → 打开 Codex Moonrise
+```
+
+**没运行时启动，已运行时退出重开**。配置完成后可添加到 Dock，或继续使用原来指向该快捷指令的桌面组件。已有重启快捷指令只需把最后的「打开 ChatGPT」改成「打开 Codex Moonrise」。
+
+[查看三步配置教程、常见问题与核对方法 →](Shortcuts/README.md)
+
+[拍视频用的镜头顺序与口播文案 →](docs/video-guide.md)
+
+直接点击 Moonrise 本身仍会复用现有客户端。只有这套快捷指令入口负责真正的重启；官方客户端原图标保持不变。
 
 ## 不只有一种颜色
 
@@ -79,6 +95,8 @@ open "Codex Moonrise.app"
 | `Source/main.swift` | AppKit 窗口、WKWebView、客户端发现、交接、配色与验证 |
 | `Preview/index.html` | 独立动画源码与浏览器演示 |
 | `Source/build.sh` | Universal 构建和本地签名 |
+| `Shortcuts/README.md` | 三步配置启动／重启快捷指令 |
+| `docs/video-guide.md` | 拍视频的演示顺序与口播文案 |
 | `docs/index.html` | GitHub Pages 演示，与 Preview 保持一致 |
 | `.github/workflows/build.yml` | macOS 构建、架构和签名检查 |
 
@@ -97,5 +115,7 @@ A 14-second cinematic macOS launcher for Codex: a starfield warp, particle logo 
 Download the Universal app from **Releases**, move it to **Applications**, and launch it from Finder or the Dock. It starts Codex if needed and reuses an existing instance otherwise. **The original Codex icon is unchanged**. Press **Esc** to skip; **1 / 2 / 3** switch persistent Silver, Amber, and Violet palettes.
 
 Requires an installed client with bundle ID `com.openai.codex`. Builds target macOS 13+ and contain Apple Silicon and Intel code; tested on Apple Silicon/macOS 27 only. Downloads are ad-hoc signed and not Apple-notarized. No Electron, external runtime, network requests, API key, or modification of the official client is required.
+
+For restart-on-click behavior, see the [Shortcuts setup guide](Shortcuts/README.md#english-quick-setup): Quit the real client → Wait 3 seconds → Open Codex Moonrise. The normal launcher continues to reuse an existing client.
 
 Build with `./Source/build.sh`. See [Third-party notices](THIRD_PARTY_NOTICES.md) for upstream attribution. This is an unofficial community project, not affiliated with or endorsed by OpenAI.
