@@ -1,0 +1,25 @@
+name: Build macOS launcher
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build universal app
+        run: ./Source/build.sh
+      - name: Verify signature and architecture
+        run: |
+          codesign --verify --deep --strict "Codex Moonrise.app"
+          xcrun lipo "Codex Moonrise.app/Contents/MacOS/Moonrise" -verify_arch arm64 x86_64
+      - name: Package
+        run: ditto -c -k --sequesterRsrc --keepParent "Codex Moonrise.app" Codex-Moonrise-macOS-universal.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Codex-Moonrise-macOS-universal
+          path: Codex-Moonrise-macOS-universal.zip

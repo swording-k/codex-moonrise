@@ -1,0 +1,7 @@
+*.app/
+*.zip
+.build/
+.DS_Store
+*.log
+/*.png
+/使用说明.md
