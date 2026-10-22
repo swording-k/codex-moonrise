@@ -4,6 +4,12 @@
 
 [返回项目首页](../README.md) · [下载 Moonrise](https://github.com/swording-k/codex-moonrise/releases/latest) · [视频拍摄脚本](../docs/video-guide.md)
 
+## 已经配置，但动画后只剩桌面？
+
+先更新到 [v2.0.1 或更新版](https://github.com/swording-k/codex-moonrise/releases/latest)，用新应用替换「应用程序」里的旧版，快捷指令仍然保持原来的三个操作。旧版只尝试激活进程，没有确保重新打开窗口，新版已修正该交接逻辑。
+
+如果新版仍提示交接失败，可查看 `~/Library/Logs/CodexMoonrise/launcher.log` 中的失败原因，不要额外添加“打开 ChatGPT”来掩盖问题。
+
 ## 先选你要的行为
 
 | 想要的效果 | 应该点击哪个入口 |

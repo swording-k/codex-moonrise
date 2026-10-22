@@ -6,14 +6,27 @@ let snapshotMode = args.contains("--snapshot")
 let verifyMode = args.contains("--verify") || args.contains("--verify-skip")
 let previewMode = args.contains("--preview") || snapshotMode || verifyMode || args.contains("--verify-palette") || args.contains("--verify-native-skip")
 func argument(_ key: String) -> String? { guard let i = args.firstIndex(of: key), args.count > i+1 else { return nil }; return args[i+1] }
-func log(_ message: String) { print("MOONRISE \(message)"); fflush(stdout) }
+func log(_ message: String) {
+    let line = "\(ISO8601DateFormatter().string(from: Date())) MOONRISE \(message)\n"
+    print(line, terminator: ""); fflush(stdout)
+    guard !previewMode else { return }
+    let directory = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Logs/CodexMoonrise")
+    let url = directory.appendingPathComponent("launcher.log")
+    do {
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let size = (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+        if !FileManager.default.fileExists(atPath: url.path) || size > 524288 { try Data().write(to: url) }
+        let handle = try FileHandle(forWritingTo: url); defer { try? handle.close() }
+        try handle.seekToEnd(); try handle.write(contentsOf: Data(line.utf8))
+    } catch { /* Diagnostics must not prevent launching the client. */ }
+}
 
 final class OverlayWindow: NSWindow { override var canBecomeKey: Bool { true } }
 
 final class Launcher: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKScriptMessageHandler {
     var window: NSWindow!
     var web: WKWebView!
-    var client: NSRunningApplication?
+    let handoff = ClientHandoff(logger: log)
     var ended = false
     var messages = 0
     var keyMonitor: Any?
@@ -45,24 +58,7 @@ final class Launcher: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKS
         guard let resource = Bundle.main.resourceURL?.appendingPathComponent("index.html"), FileManager.default.fileExists(atPath: resource.path) else { fail("找不到本地动画资源。"); return }
         watchdog = Timer.scheduledTimer(withTimeInterval: 22, repeats: false) { [weak self] _ in self?.finish("watchdog") }
         web.loadFileURL(resource, allowingReadAccessTo: resource.deletingLastPathComponent())
-        if !previewMode { launchClient() }
         log("START mode=\(previewMode ? "preview" : "launch")")
-    }
-    func launchClient() {
-        if let running = NSRunningApplication.runningApplications(withBundleIdentifier: "com.openai.codex").first {
-            client = running; log("CLIENT reused pid=\(running.processIdentifier)"); return
-        }
-        guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.openai.codex") else { fail("未找到 Codex（com.openai.codex）。请先安装客户端。"); return }
-        let config = NSWorkspace.OpenConfiguration(); config.activates = false
-        NSWorkspace.shared.openApplication(at: url, configuration: config) { [weak self] app, error in
-            DispatchQueue.main.async {
-                guard let self else { return }
-                if let error { self.fail("Codex 启动失败：\(error.localizedDescription)"); return }
-                self.client = app
-                log("CLIENT launched pid=\(app?.processIdentifier ?? 0)")
-                if self.ended { app?.activate(options: []) }
-            }
-        }
     }
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         log("WEB loaded")
@@ -126,16 +122,28 @@ final class Launcher: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKS
     func finish(_ reason: String) {
         guard !ended else { return }; ended = true; watchdog?.invalidate()
         if let keyMonitor { NSEvent.removeMonitor(keyMonitor) }
-        log("HANDOFF reason=\(reason) client=\(client?.bundleIdentifier ?? "preview")")
+        log("HANDOFF requested reason=\(reason)")
         if verifyMode || args.contains("--verify-palette") { log("VERIFY FAIL unexpected finish=\(reason)"); exit(1) }
         if args.contains("--verify-native-skip") {
             let pass = reason == "escape"; log("VERIFY NATIVE ESC \(pass ? "PASS" : "FAIL")"); if !pass { exit(1) }
         }
-        if !previewMode {
-            if let client { log("ACTIVATE success=\(client.activate(options: []))") }
-            else if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.openai.codex") { NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration(), completionHandler: nil) }
+        do {
+            window.orderOut(nil)
+            if previewMode { NSApp.terminate(nil); return }
+            guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.openai.codex") else {
+                fail("未找到 Codex（com.openai.codex）。请先安装客户端。"); return
+            }
+            log("HANDOFF opening url=\(url.path)")
+            handoff.open(url) { [self] result in
+                switch result {
+                case .success(let app):
+                    log("HANDOFF confirmed pid=\(app.processIdentifier) frontmost=true visible-window=true")
+                    NSApp.terminate(nil)
+                case .failure(let error):
+                    fail("Codex 交接失败：\(error.localizedDescription)")
+                }
+            }
         }
-        NSAnimationContext.runAnimationGroup({ context in context.duration = 0.18; window.animator().alphaValue = 0 }) { NSApp.terminate(nil) }
     }
 }
 let app = NSApplication.shared

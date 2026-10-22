@@ -10,6 +10,8 @@
 
 ## 怎么用
 
+**已经安装旧版？请更新至 [v2.0.1 或更新版本](https://github.com/swording-k/codex-moonrise/releases/latest)。**旧版在重启或没有可见窗口时可能只播放动画、不打开客户端；新版本会重新发出打开请求，并确认目标进程处于前台且有可见窗口。原快捷指令无需重建。
+
 1. 从 **Releases** 下载 `Codex-Moonrise-macOS-universal.zip`，解压。
 2. 把 **Codex Moonrise.app** 拖进“应用程序”。
 3. 双击启动，或把它拖进 Dock，以后点击这个图标。
@@ -92,7 +94,9 @@ open "Codex Moonrise.app"
 
 | 文件 | 内容 |
 | --- | --- |
-| `Source/main.swift` | AppKit 窗口、WKWebView、客户端发现、交接、配色与验证 |
+| `Source/main.swift` | AppKit 窗口、WKWebView、配色与诊断 |
+| `Source/ClientHandoff.swift` | 打开／重新打开客户端、窗口验证、重试与超时 |
+| `Tests/run-handoff.sh` | 独立测试应用上的原生交接回归测试 |
 | `Preview/index.html` | 独立动画源码与浏览器演示 |
 | `Source/build.sh` | Universal 构建和本地签名 |
 | `Shortcuts/README.md` | 三步配置启动／重启快捷指令 |
@@ -100,7 +104,11 @@ open "Codex Moonrise.app"
 | `docs/index.html` | GitHub Pages 演示，与 Preview 保持一致 |
 | `.github/workflows/build.yml` | macOS 构建、架构和签名检查 |
 
-冷启动通过 `NSWorkspace.openApplication` 实现；完成动画后激活客户端。已实测正在运行的 Codex 的复用与交接，尚未通过关闭活跃聊天来验证冷启动。没有检测客户端内部页面就绪，动画不会等待实际任务加载完成。
+动画完成后，通过 `NSWorkspace.openApplication` 发出明确的打开／重新打开请求，等待目标进程在前台拥有可见窗口，再退出启动器；最多尝试三次，15 秒内未确认会显示错误，而不是静默结束。不会强制退出客户端。
+
+原生集成测试使用独立测试应用，覆盖冷启动、进程存在但无窗口、旧进程已退出及目标不存在四种情况，不会结束你正在使用的 Codex。运行 `./Tests/run-handoff.sh` 可复现。真实 Codex 仍需在安装设备上完成快捷指令退出重启的验收；可见窗口也不等同于内部页面或任务已经加载完毕。
+
+本地诊断日志位于 `~/Library/Logs/CodexMoonrise/launcher.log`，只记录启动／交接状态，不记录聊天内容；达到约 512 KiB 后重置。
 
 ## 致谢
 
