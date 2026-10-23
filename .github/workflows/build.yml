@@ -18,6 +18,12 @@ jobs:
           codesign --verify --deep --strict "Codex Moonrise.app"
           archs="$(xcrun lipo -archs "Codex Moonrise.app/Contents/MacOS/Moonrise")"
           [[ " $archs " == *" arm64 "* && " $archs " == *" x86_64 "* ]]
+      - name: Verify bundled soundtrack
+        run: |
+          xcrun swiftc Source/Soundtrack.swift Tests/SoundtrackTests.swift -framework AVFoundation -o .build/soundtrack-tests
+          .build/soundtrack-tests Preview/soundtrack.m4a
+          cmp Preview/index.html docs/index.html
+          cmp Preview/soundtrack.m4a docs/soundtrack.m4a
       - name: Exercise native launch and reopen handoff
         run: |
           set +e
@@ -27,7 +33,10 @@ jobs:
             echo "Native GUI tests skipped: runner desktop is locked or unavailable." >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
-          exit "$result"
+          if [ "$result" -ne 0 ]; then exit "$result"; fi
+          xcrun swiftc -parse-as-library Tests/WebAudioTests.swift -framework AppKit -framework WebKit -o .build/web-audio-tests
+          .build/web-audio-tests "$PWD/Preview/index.html"
+          "./Codex Moonrise.app/Contents/MacOS/Moonrise" --verify-sound
       - name: Package
         run: ditto -c -k --sequesterRsrc --keepParent "Codex Moonrise.app" Codex-Moonrise-macOS-universal.zip
       - uses: actions/upload-artifact@v4

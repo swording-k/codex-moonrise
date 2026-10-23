@@ -10,7 +10,7 @@
 
 ## 怎么用
 
-**已经安装旧版？请更新至 [v2.0.1 或更新版本](https://github.com/swording-k/codex-moonrise/releases/latest)。**旧版在重启或没有可见窗口时可能只播放动画、不打开客户端；新版本会重新发出打开请求，并确认目标进程处于前台且有可见窗口。原快捷指令无需重建。
+**已经安装旧版？请更新至 [v2.1.0 或更新版本](https://github.com/swording-k/codex-moonrise/releases/latest)。**旧版在重启或没有可见窗口时可能只播放动画、不打开客户端；新版本会重新发出打开请求，并确认目标进程处于前台且有可见窗口。原快捷指令无需重建。
 
 1. 从 **Releases** 下载 `Codex-Moonrise-macOS-universal.zip`，解压。
 2. 把 **Codex Moonrise.app** 拖进“应用程序”。
@@ -56,11 +56,19 @@
 
 ![粒子标志](docs/particles.jpg)
 
+## 声音：氛围底音 + 同步音效
+
+v2.1.0 加入原创合成声景：低频氛围底音、开场气流、标志与字标聚合、五个面板提示音，以及结束收束音。14 秒声音与动画同时开始，默认低音量，不修改系统音量。
+
+右下角「声音」按钮或 **M** 切换静音并记住选择；按 **Esc** 或播放结束，声音立即停止。原有快捷指令无需修改，替换应用后即可使用。浏览器若限制自动播放，点击「开启声音」会从头同步播放；网页与应用分别保存声音偏好。
+
+音频由本仓库的 `Source/generate-audio.py` 合成，不包含下载的歌曲或音效采样，随项目以 MIT 协议提供。日常使用和构建不需要 FFmpeg；仅重新生成音频需要 Python 3 与 FFmpeg。
+
 ## 在线预览
 
 [打开浏览器演示](https://swording-k.github.io/codex-moonrise/)。演示只播放动画，不会启动你的本机应用。结束后停留在字标，可重播、切换配色。
 
-浏览器和原生启动器分别保存配色。所有画面由本地 Canvas / CSS 绘制，无 CDN、无模型 API、无音频或遥测。
+浏览器和原生启动器分别保存配色。所有画面由本地 Canvas / CSS 绘制，无 CDN、无模型 API、无遥测；声音资源也随应用离线打包。
 
 代码、面板和进度都是艺术化场景，**不代表真实模型、工具或聊天上下文的加载状态**。
 
@@ -82,6 +90,8 @@ open "Codex Moonrise.app"
 "./Codex Moonrise.app/Contents/MacOS/Moonrise" --verify
 # 原生 Esc 键事件
 "./Codex Moonrise.app/Contents/MacOS/Moonrise" --verify-native-skip
+# 声音按钮、静音 bridge 与持久化（验证后恢复原偏好）
+"./Codex Moonrise.app/Contents/MacOS/Moonrise" --verify-sound
 # 配色 bridge 与持久化（验证后恢复原偏好）
 "./Codex Moonrise.app/Contents/MacOS/Moonrise" --verify-palette
 # 仅播放，不启动 Codex
@@ -95,6 +105,8 @@ open "Codex Moonrise.app"
 | 文件 | 内容 |
 | --- | --- |
 | `Source/main.swift` | AppKit 窗口、WKWebView、配色与诊断 |
+| `Source/Soundtrack.swift` | 本地音频播放、静音记忆与停止 |
+| `Preview/soundtrack.m4a` | 14 秒原创合成声景 |
 | `Source/ClientHandoff.swift` | 打开／重新打开客户端、窗口验证、重试与超时 |
 | `Tests/run-handoff.sh` | 独立测试应用上的原生交接回归测试 |
 | `Preview/index.html` | 独立动画源码与浏览器演示 |
@@ -118,9 +130,11 @@ open "Codex Moonrise.app"
 
 ## English
 
-A 14-second cinematic macOS launcher for Codex: a starfield warp, particle logo assembly, a dimensional workspace, streaming code, floating panels, and a CRT handoff to the real application.
+A 14-second cinematic macOS launcher for Codex with an original ambient bed and synchronized sound effects: a starfield warp, particle logo assembly, a dimensional workspace, streaming code, floating panels, and a CRT handoff to the real application.
 
 Download the Universal app from **Releases**, move it to **Applications**, and launch it from Finder or the Dock. It starts Codex if needed and reuses an existing instance otherwise. **The original Codex icon is unchanged**. Press **Esc** to skip; **1 / 2 / 3** switch persistent Silver, Amber, and Violet palettes.
+
+Press **M** or the sound button to toggle persistent mute. Audio stops on skip or completion. Browser autoplay may require clicking “开启声音”, which restarts the sequence in sync.
 
 Requires an installed client with bundle ID `com.openai.codex`. Builds target macOS 13+ and contain Apple Silicon and Intel code; tested on Apple Silicon/macOS 27 only. Downloads are ad-hoc signed and not Apple-notarized. No Electron, external runtime, network requests, API key, or modification of the official client is required.
 

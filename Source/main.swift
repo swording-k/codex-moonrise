@@ -4,7 +4,7 @@ import WebKit
 let args = CommandLine.arguments
 let snapshotMode = args.contains("--snapshot")
 let verifyMode = args.contains("--verify") || args.contains("--verify-skip")
-let previewMode = args.contains("--preview") || snapshotMode || verifyMode || args.contains("--verify-palette") || args.contains("--verify-native-skip")
+let previewMode = args.contains("--preview") || snapshotMode || verifyMode || args.contains("--verify-palette") || args.contains("--verify-native-skip") || args.contains("--verify-sound")
 func argument(_ key: String) -> String? { guard let i = args.firstIndex(of: key), args.count > i+1 else { return nil }; return args[i+1] }
 func log(_ message: String) {
     let line = "\(ISO8601DateFormatter().string(from: Date())) MOONRISE \(message)\n"
@@ -27,6 +27,7 @@ final class Launcher: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKS
     var window: NSWindow!
     var web: WKWebView!
     let handoff = ClientHandoff(logger: log)
+    var soundtrack: Soundtrack?
     var ended = false
     var messages = 0
     var keyMonitor: Any?
@@ -46,6 +47,12 @@ final class Launcher: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKS
         let palette = UserDefaults.standard.string(forKey: "palette") ?? "silver"
         let safePalette = ["silver", "amber", "violet"].contains(palette) ? palette : "silver"
         config.userContentController.addUserScript(WKUserScript(source: "window.MOONRISE_PALETTE='\(safePalette)';", injectionTime: .atDocumentStart, forMainFrameOnly: true))
+        let silentAudio = snapshotMode || args.contains(where: { $0.hasPrefix("--verify") })
+        let muted = UserDefaults.standard.bool(forKey: "soundMuted")
+        config.userContentController.addUserScript(WKUserScript(source: "window.MOONRISE_MUTED=\(muted);window.MOONRISE_SILENT=\(silentAudio);", injectionTime: .atDocumentStart, forMainFrameOnly: true))
+        if !silentAudio, let audioURL = Bundle.main.resourceURL?.appendingPathComponent("soundtrack.m4a") {
+            do { soundtrack = try Soundtrack(url: audioURL) } catch { log("AUDIO unavailable: \(error.localizedDescription)") }
+        }
         if snapshotMode { let t = Double(argument("--time") ?? "3.8") ?? 3.8; config.userContentController.addUserScript(WKUserScript(source: "window.MOONRISE_FRAME=\(t);", injectionTime: .atDocumentStart, forMainFrameOnly: true)) }
         web = WKWebView(frame: NSRect(origin: .zero, size: rect.size), configuration: config)
         web.navigationDelegate = self
@@ -64,6 +71,15 @@ final class Launcher: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKS
         log("WEB loaded")
         if snapshotMode {
             DispatchQueue.main.asyncAfter(deadline: .now()+0.8) { [weak self] in self?.snapshot() }
+        } else if args.contains("--verify-sound") {
+            let before = UserDefaults.standard.object(forKey: "soundMuted")
+            web.evaluateJavaScript("toggleSound(); JSON.stringify({muted:soundMuted,label:document.querySelector('#sound').textContent})") { result, error in
+                let state = (result as? String)?.data(using: .utf8).flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
+                let muted = state?["muted"] as? Bool
+                let pass = error == nil && muted != nil && UserDefaults.standard.bool(forKey: "soundMuted") == muted && state?["label"] as? String == (muted == true ? "声音 关" : "声音 开")
+                if let before { UserDefaults.standard.set(before, forKey: "soundMuted") } else { UserDefaults.standard.removeObject(forKey: "soundMuted") }
+                log("VERIFY SOUND \(pass ? "PASS" : "FAIL")"); if !pass { exit(1) }; NSApp.terminate(nil)
+            }
         } else if args.contains("--verify-palette") {
             let before = UserDefaults.standard.string(forKey: "palette")
             web.evaluateJavaScript("setPalette('violet'); window.bootState.palette") { result, error in
@@ -92,6 +108,14 @@ final class Launcher: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKS
             if ["silver", "amber", "violet"].contains(value) { UserDefaults.standard.set(value, forKey: "palette"); log("PALETTE saved=\(value)") }
             return
         }
+        if reason == "sound:ready" {
+            if !ended { soundtrack?.start(); log("AUDIO started=\(soundtrack?.isPlaying ?? false)") }
+            return
+        }
+        if reason.hasPrefix("sound:muted:") {
+            UserDefaults.standard.set(reason == "sound:muted:true", forKey: "soundMuted")
+            soundtrack?.setMuted(reason == "sound:muted:true"); return
+        }
         guard ["complete", "skip"].contains(reason) else { return }
         messages += 1
         if verifyMode {
@@ -107,6 +131,7 @@ final class Launcher: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKS
             }
         } else { finish(reason) }
     }
+    func applicationWillTerminate(_ notification: Notification) { soundtrack?.stop() }
     func snapshot() {
         let config = WKSnapshotConfiguration(); config.rect = web.bounds
         web.takeSnapshot(with: config) { image, error in
@@ -116,11 +141,11 @@ final class Launcher: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKS
         }
     }
     func fail(_ message: String) {
-        log("ERROR \(message)"); ended = true; watchdog?.invalidate(); window?.orderOut(nil)
+        soundtrack?.stop(); log("ERROR \(message)"); ended = true; watchdog?.invalidate(); window?.orderOut(nil)
         let alert = NSAlert(); alert.messageText = "Codex Moonrise"; alert.informativeText = message; alert.runModal(); NSApp.terminate(nil)
     }
     func finish(_ reason: String) {
-        guard !ended else { return }; ended = true; watchdog?.invalidate()
+        guard !ended else { return }; ended = true; watchdog?.invalidate(); soundtrack?.stop(); log("AUDIO stopped")
         if let keyMonitor { NSEvent.removeMonitor(keyMonitor) }
         log("HANDOFF requested reason=\(reason)")
         if verifyMode || args.contains("--verify-palette") { log("VERIFY FAIL unexpected finish=\(reason)"); exit(1) }
